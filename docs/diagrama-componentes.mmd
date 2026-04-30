@@ -1,0 +1,30 @@
+```mermaid
+flowchart LR
+    Client[Cliente HTTP]
+
+    subgraph API[API]
+        FastAPI[FastAPI Router]
+    end
+
+    subgraph Service[Service]
+        TaskService[Task Service]
+        TaskPrioritizer[TaskPrioritizer]
+    end
+
+    subgraph Repository[Repository]
+        TaskRepository[Task Repository]
+    end
+
+    DB[(Banco de Dados)]
+
+    Client -->|HTTP JSON| FastAPI
+    FastAPI -->|Request DTO| TaskService
+    TaskService -->|Dados da tarefa| TaskPrioritizer
+    TaskPrioritizer -->|Prioridade calculada| TaskService
+    TaskService -->|CRUD| TaskRepository
+    TaskRepository -->|SQL / ORM| DB
+    DB -->|Registros| TaskRepository
+    TaskRepository -->|Entidades| TaskService
+    TaskService -->|Response DTO| FastAPI
+    FastAPI -->|HTTP JSON| Client
+```
