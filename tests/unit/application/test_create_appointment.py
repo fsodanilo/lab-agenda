@@ -36,6 +36,30 @@ async def test_create_appointment_returns_repository_result() -> None:
 
 
 @pytest.mark.anyio
+async def test_create_appointment_validates_repository_call() -> None:
+    repository = AsyncMock(spec=AppointmentRepository)
+    scheduled_for = datetime(2026, 5, 1, 14, 30)
+    repository.create.return_value = Appointment(
+        id="appointment-3",
+        user_id="user-789",
+        datetime=scheduled_for,
+        status=AppointmentStatus.SCHEDULED,
+        notes="primeira consulta",
+    )
+    use_case = CreateAppointmentUseCase(repository=repository)
+
+    await use_case.execute(
+        CreateAppointmentCommand(
+            user_id="user-789",
+            datetime=scheduled_for,
+            notes="primeira consulta",
+        )
+    )
+
+    repository.create.assert_awaited_once()
+
+
+@pytest.mark.anyio
 async def test_create_appointment_calls_repository_with_domain_entity() -> None:
     repository = AsyncMock(spec=AppointmentRepository)
     scheduled_for = datetime(2026, 5, 2, 9, 0)
