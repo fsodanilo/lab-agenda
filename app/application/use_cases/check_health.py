@@ -6,5 +6,5 @@ class CheckHealthUseCase:
     def __init__(self, health_service: HealthService) -> None:
         self._health_service = health_service
 
-    def execute(self) -> HealthStatus:
-        return self._health_service.check()
+    async def execute(self) -> HealthStatus:
+        return await self._health_service.check()

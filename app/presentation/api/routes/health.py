@@ -8,8 +8,8 @@ router = APIRouter(tags=["health"])
 
 
 @router.get("/health", response_model=HealthResponse, status_code=status.HTTP_200_OK)
-def health_check(
+async def health_check(
     use_case: CheckHealthUseCase = Depends(get_check_health_use_case),
 ) -> HealthResponse:
-    result = use_case.execute()
+    result = await use_case.execute()
     return HealthResponse.model_validate(result)

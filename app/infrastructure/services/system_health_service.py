@@ -9,7 +9,7 @@ class SystemHealthService(HealthService):
         self._settings = settings
         self._logger = get_logger(__name__)
 
-    def check(self) -> HealthStatus:
+    async def check(self) -> HealthStatus:
         self._logger.info("health_check_executed")
         return HealthStatus(
             status="ok",
