@@ -9,10 +9,14 @@ O projeto esta estruturado em camadas para separar responsabilidades de dominio,
 No estado atual, a aplicacao entrega:
 
 - inicializacao basica do FastAPI
+- fluxo assincrono na aplicacao e nos contratos principais
 - endpoint de health check em `GET /health`
 - configuracao por variaveis de ambiente com Pydantic Settings
 - logging centralizado
-- teste automatizado inicial com pytest
+- integracao preparada com MongoDB usando Motor
+- repository base generico e repository MongoDB para `Appointment`
+- caso de uso assincrono para criacao de `Appointment`
+- testes automatizados com pytest, incluindo testes unitarios com mock de repository
 
 ## Requisitos
 
@@ -30,22 +34,50 @@ app/
 		use_cases/
 	infrastructure/
 		config/
+		database/
 		logging/
+		repositories/
 		services/
 	presentation/
 		api/
 			routes/
 			schemas/
 tests/
+	unit/
 ```
 
 ## Camadas
 
 - `domain`: entidades e contratos do negocio
 - `application`: casos de uso e orquestracao
-- `infrastructure`: configuracao, logging e implementacoes concretas
+- `infrastructure`: configuracao, logging, conexao com MongoDB e implementacoes concretas
 - `presentation`: rotas e schemas HTTP
 - `tests`: testes automatizados
+
+## Modulo Appointment
+
+O dominio `Appointment` foi introduzido com os campos:
+
+- `id`
+- `user_id`
+- `datetime`
+- `status`
+- `notes`
+
+Status suportados:
+
+- `scheduled`
+- `confirmed`
+- `canceled`
+
+O projeto ja possui:
+
+- interface `AppointmentRepository` na camada de dominio
+- `MongoBaseRepository` generico na infraestrutura
+- `MongoAppointmentRepository` como implementacao concreta
+- `CreateAppointmentUseCase` assincrono na camada de aplicacao
+
+No momento, esse modulo esta preparado na arquitetura e coberto por testes unitarios, mas ainda nao esta exposto por rotas HTTP.
 
 ## Configuracao De Ambiente
 
@@ -60,6 +92,8 @@ APP_ENV=development
 APP_HOST=0.0.0.0
 APP_PORT=8000
 LOG_LEVEL=INFO
+APP_MONGODB_URI=mongodb://localhost:27017
+APP_MONGODB_DB_NAME=lab_agenda
 ```
 
 Para iniciar a configuracao local:
@@ -96,6 +130,8 @@ Para subir a API localmente:
 uvicorn app.main:app --reload
 ```
 
+Para recursos que dependem de persistencia MongoDB, mantenha uma instancia do MongoDB disponivel e configure `APP_MONGODB_URI` e `APP_MONGODB_DB_NAME` no `.env`.
+
 Documentacao automatica:
 
 - Swagger UI: `http://127.0.0.1:8000/docs`
@@ -127,17 +163,28 @@ Para executar os testes:
 pytest
 ```
 
+Testes unitarios do modulo `Appointment`:
+
+```bash
+pytest tests/unit/application
+```
+
+Esses testes usam mock de repository e nao acessam banco real.
+
 ## Dependencias Principais
 
 - FastAPI
 - Uvicorn
 - Pydantic
 - Pydantic Settings
+- Motor
 - Pytest
 
 ## Principios Adotados
 
 - separacao clara entre regras de negocio e framework
 - injecao de dependencia por funcoes de composicao
+- contratos e casos de uso orientados a async
+- repositories definidos no dominio e implementados na infraestrutura
 - rotas sem regra de negocio
 - base preparada para extensao sem acoplamento desnecessario
