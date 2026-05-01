@@ -3,6 +3,7 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 
 from app.infrastructure.config.settings import Settings
+from app.infrastructure.database.mongo import close_mongo_connection
 from app.infrastructure.dependencies import get_settings
 from app.infrastructure.logging.logger import configure_logging, get_logger
 from app.presentation.router import api_router
@@ -15,6 +16,7 @@ async def lifespan(app: FastAPI):
     logger = get_logger(__name__)
     logger.info("starting_application", extra={"environment": settings.app_env})
     yield
+    await close_mongo_connection()
     logger.info("stopping_application")
 
 
