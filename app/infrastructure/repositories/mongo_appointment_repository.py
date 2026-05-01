@@ -11,8 +11,9 @@ class MongoAppointmentRepository(MongoBaseRepository[Appointment], AppointmentRe
     def __init__(self, database: AsyncIOMotorDatabase) -> None:
         super().__init__(database=database, collection_name="appointments")
 
-    async def list_by_user_id(self, user_id: str) -> list[Appointment]:
-        cursor = self._collection.find({"user_id": user_id}).sort("datetime", 1)
+    async def list(self, user_id: str | None = None) -> list[Appointment]:
+        query = {"user_id": user_id} if user_id is not None else {}
+        cursor = self._collection.find(query).sort("datetime", 1)
         documents = await cursor.to_list(length=None)
         return [self._deserialize(document) for document in documents]
 

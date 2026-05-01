@@ -29,6 +29,29 @@ class MongoBaseRepository(ABC, Generic[EntityT]):
             return None
         return self._deserialize(document)
 
+    async def update(self, entity_id: str, entity: EntityT) -> EntityT | None:
+        object_id = self._parse_object_id(entity_id)
+        if object_id is None:
+            return None
+
+        payload = self._serialize(entity)
+        result = await self._collection.replace_one({"_id": object_id}, payload)
+        if result.matched_count == 0:
+            return None
+
+        document = await self._collection.find_one({"_id": object_id})
+        if document is None:
+            return None
+        return self._deserialize(document)
+
+    async def delete(self, entity_id: str) -> bool:
+        object_id = self._parse_object_id(entity_id)
+        if object_id is None:
+            return False
+
+        result = await self._collection.delete_one({"_id": object_id})
+        return result.deleted_count > 0
+
     def _parse_object_id(self, entity_id: str) -> ObjectId | None:
         if not ObjectId.is_valid(entity_id):
             return None

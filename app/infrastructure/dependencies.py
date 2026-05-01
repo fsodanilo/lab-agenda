@@ -1,7 +1,11 @@
 from functools import lru_cache
 
 from app.application.use_cases.create_appointment import CreateAppointmentUseCase
+from app.application.use_cases.delete_appointment import DeleteAppointmentUseCase
+from app.application.use_cases.get_appointment import GetAppointmentUseCase
 from app.application.use_cases.check_health import CheckHealthUseCase
+from app.application.use_cases.list_appointments import ListAppointmentsUseCase
+from app.application.use_cases.update_appointment import UpdateAppointmentUseCase
 from app.domain.interfaces.appointment_repository import AppointmentRepository
 from app.domain.interfaces.health_service import HealthService
 from app.infrastructure.config.settings import Settings
@@ -32,4 +36,20 @@ def get_appointment_repository() -> AppointmentRepository:
 
 def get_create_appointment_use_case() -> CreateAppointmentUseCase:
     return CreateAppointmentUseCase(repository=get_appointment_repository())
+
+
+def get_get_appointment_use_case() -> GetAppointmentUseCase:
+    return GetAppointmentUseCase(repository=get_appointment_repository())
+
+
+def get_list_appointments_use_case() -> ListAppointmentsUseCase:
+    return ListAppointmentsUseCase(repository=get_appointment_repository())
+
+
+def get_update_appointment_use_case() -> UpdateAppointmentUseCase:
+    return UpdateAppointmentUseCase(repository=get_appointment_repository())
+
+
+def get_delete_appointment_use_case() -> DeleteAppointmentUseCase:
+    return DeleteAppointmentUseCase(repository=get_appointment_repository())
 
