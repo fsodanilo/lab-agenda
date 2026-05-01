@@ -11,12 +11,13 @@ No estado atual, a aplicacao entrega:
 - inicializacao basica do FastAPI
 - fluxo assincrono na aplicacao e nos contratos principais
 - endpoint de health check em `GET /health`
+- CRUD de compromissos em `Appointment`
 - configuracao por variaveis de ambiente com Pydantic Settings
 - logging centralizado
 - integracao preparada com MongoDB usando Motor
 - repository base generico e repository MongoDB para `Appointment`
-- caso de uso assincrono para criacao de `Appointment`
-- testes automatizados com pytest, incluindo testes unitarios com mock de repository
+- casos de uso assincronos para criar, buscar, listar, atualizar e deletar `Appointment`
+- testes automatizados com pytest, incluindo testes unitarios e integracao sem banco real
 
 ## Requisitos
 
@@ -75,9 +76,16 @@ O projeto ja possui:
 - interface `AppointmentRepository` na camada de dominio
 - `MongoBaseRepository` generico na infraestrutura
 - `MongoAppointmentRepository` como implementacao concreta
-- `CreateAppointmentUseCase` assincrono na camada de aplicacao
+- casos de uso de criacao, busca, listagem, atualizacao e delecao na camada de aplicacao
+- rotas HTTP com schemas Pydantic para request e response
 
-No momento, esse modulo esta preparado na arquitetura e coberto por testes unitarios, mas ainda nao esta exposto por rotas HTTP.
+Endpoints disponiveis para compromissos:
+
+- `POST /appointments`
+- `GET /appointments/{id}`
+- `GET /appointments`
+- `PUT /appointments/{id}`
+- `DELETE /appointments/{id}`
 
 ## Configuracao De Ambiente
 
@@ -155,6 +163,29 @@ Resposta esperada:
 }
 ```
 
+### Appointments
+
+Exemplo de criacao:
+
+```http
+POST /appointments
+```
+
+```json
+{
+	"user_id": "user-123",
+	"datetime": "2026-05-03T15:30:00Z",
+	"status": "scheduled",
+	"notes": "consulta inicial"
+}
+```
+
+O campo `datetime` deve incluir timezone e `status` aceita apenas:
+
+- `scheduled`
+- `confirmed`
+- `canceled`
+
 ## Testes
 
 Para executar os testes:
@@ -170,6 +201,12 @@ pytest tests/unit/application
 ```
 
 Esses testes usam mock de repository e nao acessam banco real.
+
+Teste de integracao da API de compromissos:
+
+```bash
+pytest tests/integration
+```
 
 ## Dependencias Principais
 
