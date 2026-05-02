@@ -57,6 +57,57 @@ tests/
 - `presentation`: rotas e schemas HTTP
 - `tests`: testes automatizados
 
+## Arquitetura
+
+```mermaid
+flowchart LR
+	Client[Cliente HTTP] --> Routes[Rotas FastAPI]
+
+	subgraph Presentation[Presentation]
+		Routes
+		Schemas[Schemas Pydantic]
+	end
+
+	subgraph Application[Application]
+		CreateUC[CreateAppointmentUseCase]
+		CrudUC[Get/List/Update/Delete Use Cases]
+	end
+
+	subgraph Domain[Domain]
+		Appointment[Appointment]
+		RepoPort[AppointmentRepository]
+		CalendarPort[CalendarService]
+	end
+
+	subgraph Infrastructure[Infrastructure]
+		MongoRepo[MongoAppointmentRepository]
+		GoogleSvc[GoogleCalendarService]
+		Settings[Settings]
+		Mongo[(MongoDB)]
+	end
+
+	GCal[Google Calendar API]
+
+	Routes --> Schemas
+	Routes --> CreateUC
+	Routes --> CrudUC
+
+	CreateUC --> Appointment
+	CrudUC --> Appointment
+
+	CreateUC --> RepoPort
+	CrudUC --> RepoPort
+	CreateUC --> CalendarPort
+
+	RepoPort -. implementado por .-> MongoRepo
+	CalendarPort -. implementado por .-> GoogleSvc
+
+	MongoRepo --> Mongo
+	GoogleSvc --> GCal
+	Settings --> MongoRepo
+	Settings --> GoogleSvc
+```
+
 ## Modulo Appointment
 
 O dominio `Appointment` foi introduzido com os campos:
