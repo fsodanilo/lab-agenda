@@ -65,10 +65,20 @@ tests/
 ```mermaid
 flowchart LR
 	Client[Cliente HTTP] --> Routes[Rotas FastAPI]
+	User[Usuario em linguagem natural] --> AgentEntry[Entrada do Agente]
 
 	subgraph Presentation[Presentation]
 		Routes
 		Schemas[Schemas Pydantic]
+	end
+
+	subgraph Agents[Agents]
+		AgentEntry
+		Decision[No de decisao]
+		CreateAction[No de acao: criar]
+		ListAction[No de acao: listar]
+		UpdateAction[No de acao: atualizar]
+		DeleteAction[No de acao: deletar]
 	end
 
 	subgraph Application[Application]
@@ -94,6 +104,15 @@ flowchart LR
 	Routes --> Schemas
 	Routes --> CreateUC
 	Routes --> CrudUC
+	AgentEntry --> Decision
+	Decision --> CreateAction
+	Decision --> ListAction
+	Decision --> UpdateAction
+	Decision --> DeleteAction
+	CreateAction --> CreateUC
+	ListAction --> CrudUC
+	UpdateAction --> CrudUC
+	DeleteAction --> CrudUC
 
 	CreateUC --> Appointment
 	CrudUC --> Appointment
