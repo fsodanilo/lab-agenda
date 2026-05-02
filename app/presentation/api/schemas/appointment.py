@@ -33,5 +33,6 @@ class AppointmentResponse(BaseModel):
     datetime: datetime
     status: AppointmentStatus
     notes: str | None = None
+    event_id: str | None = None
 
     model_config = ConfigDict(from_attributes=True)

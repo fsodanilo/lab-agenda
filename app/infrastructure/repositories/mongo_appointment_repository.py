@@ -23,6 +23,7 @@ class MongoAppointmentRepository(MongoBaseRepository[Appointment], AppointmentRe
             "datetime": entity.datetime,
             "status": entity.status.value,
             "notes": entity.notes,
+            "event_id": entity.event_id,
         }
 
     def _deserialize(self, document: dict[str, Any]) -> Appointment:
@@ -32,4 +33,5 @@ class MongoAppointmentRepository(MongoBaseRepository[Appointment], AppointmentRe
             datetime=document["datetime"],
             status=AppointmentStatus(document["status"]),
             notes=document.get("notes"),
+            event_id=document.get("event_id"),
         )

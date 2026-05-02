@@ -15,4 +15,5 @@ class Appointment:
     datetime: datetime
     status: AppointmentStatus
     notes: str | None = None
+    event_id: str | None = None
     id: str | None = None

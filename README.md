@@ -15,8 +15,10 @@ No estado atual, a aplicacao entrega:
 - configuracao por variaveis de ambiente com Pydantic Settings
 - logging centralizado
 - integracao preparada com MongoDB usando Motor
+- integracao com Google Calendar usando o cliente oficial da API Google
 - repository base generico e repository MongoDB para `Appointment`
 - casos de uso assincronos para criar, buscar, listar, atualizar e deletar `Appointment`
+- criacao de evento no Google Calendar ao criar compromisso, com persistencia de `event_id`
 - testes automatizados com pytest, incluindo testes unitarios e integracao sem banco real
 
 ## Requisitos
@@ -64,6 +66,7 @@ O dominio `Appointment` foi introduzido com os campos:
 - `datetime`
 - `status`
 - `notes`
+- `event_id`
 
 Status suportados:
 
@@ -74,8 +77,10 @@ Status suportados:
 O projeto ja possui:
 
 - interface `AppointmentRepository` na camada de dominio
+- interface `CalendarService` na camada de dominio
 - `MongoBaseRepository` generico na infraestrutura
 - `MongoAppointmentRepository` como implementacao concreta
+- `GoogleCalendarService` como adaptador da API externa
 - casos de uso de criacao, busca, listagem, atualizacao e delecao na camada de aplicacao
 - rotas HTTP com schemas Pydantic para request e response
 
@@ -102,6 +107,8 @@ APP_PORT=8000
 LOG_LEVEL=INFO
 APP_MONGODB_URI=mongodb://localhost:27017
 APP_MONGODB_DB_NAME=lab_agenda
+APP_GOOGLE_CALENDAR_ID=your-calendar-id@group.calendar.google.com
+APP_GOOGLE_SERVICE_ACCOUNT_FILE=credentials/service-account.json
 ```
 
 Para iniciar a configuracao local:
@@ -139,6 +146,8 @@ uvicorn app.main:app --reload
 ```
 
 Para recursos que dependem de persistencia MongoDB, mantenha uma instancia do MongoDB disponivel e configure `APP_MONGODB_URI` e `APP_MONGODB_DB_NAME` no `.env`.
+
+Para a integracao com Google Calendar, configure `APP_GOOGLE_CALENDAR_ID` e `APP_GOOGLE_SERVICE_ACCOUNT_FILE` com as credenciais da conta de servico. As credenciais devem ficar fora do codigo-fonte e ser carregadas por variaveis de ambiente.
 
 Documentacao automatica:
 
@@ -179,6 +188,8 @@ POST /appointments
 	"notes": "consulta inicial"
 }
 ```
+
+Ao criar um compromisso, a aplicacao cria um evento correspondente no Google Calendar e persiste o `event_id` retornado pela API.
 
 O campo `datetime` deve incluir timezone e `status` aceita apenas:
 

@@ -4,8 +4,12 @@ from fastapi.testclient import TestClient
 
 from app.application.use_cases.create_appointment import CreateAppointmentUseCase
 from app.domain.entities.appointment import Appointment, AppointmentStatus
+from app.domain.interfaces.calendar_service import CalendarService
 from app.domain.interfaces.appointment_repository import AppointmentRepository
-from app.infrastructure.dependencies import get_create_appointment_use_case
+from app.infrastructure.dependencies import (
+    get_calendar_service,
+    get_create_appointment_use_case,
+)
 from app.main import create_application
 
 
@@ -20,6 +24,7 @@ class InMemoryAppointmentRepository(AppointmentRepository):
             datetime=entity.datetime,
             status=entity.status,
             notes=entity.notes,
+            event_id=entity.event_id,
         )
         self._items[appointment.id] = appointment
         return appointment
@@ -36,6 +41,7 @@ class InMemoryAppointmentRepository(AppointmentRepository):
             datetime=entity.datetime,
             status=entity.status,
             notes=entity.notes,
+            event_id=entity.event_id,
         )
         self._items[entity_id] = updated
         return updated
@@ -50,14 +56,27 @@ class InMemoryAppointmentRepository(AppointmentRepository):
         return [item for item in items if item.user_id == user_id]
 
 
+class FakeCalendarService(CalendarService):
+    async def create_event(self, appointment: Appointment) -> str:
+        return "integration-event-1"
+
+
 def test_create_appointment_endpoint_returns_created_resource() -> None:
     app = create_application()
     repository = InMemoryAppointmentRepository()
+    calendar_service = FakeCalendarService()
 
     def override_use_case() -> CreateAppointmentUseCase:
-        return CreateAppointmentUseCase(repository=repository)
+        return CreateAppointmentUseCase(
+            repository=repository,
+            calendar_service=calendar_service,
+        )
+
+    def override_calendar_service() -> CalendarService:
+        return calendar_service
 
     app.dependency_overrides[get_create_appointment_use_case] = override_use_case
+    app.dependency_overrides[get_calendar_service] = override_calendar_service
 
     with TestClient(app) as client:
         response = client.post(
@@ -77,4 +96,5 @@ def test_create_appointment_endpoint_returns_created_resource() -> None:
         "datetime": "2026-05-03T15:30:00Z",
         "status": "scheduled",
         "notes": "consulta por integracao",
+        "event_id": "integration-event-1",
     }

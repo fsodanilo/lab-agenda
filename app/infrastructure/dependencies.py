@@ -7,12 +7,14 @@ from app.application.use_cases.check_health import CheckHealthUseCase
 from app.application.use_cases.list_appointments import ListAppointmentsUseCase
 from app.application.use_cases.update_appointment import UpdateAppointmentUseCase
 from app.domain.interfaces.appointment_repository import AppointmentRepository
+from app.domain.interfaces.calendar_service import CalendarService
 from app.domain.interfaces.health_service import HealthService
 from app.infrastructure.config.settings import Settings
 from app.infrastructure.database.mongo import get_mongo_database
 from app.infrastructure.repositories.mongo_appointment_repository import (
     MongoAppointmentRepository,
 )
+from app.infrastructure.services.google_calendar_service import GoogleCalendarService
 from app.infrastructure.services.system_health_service import SystemHealthService
 
 
@@ -34,8 +36,15 @@ def get_appointment_repository() -> AppointmentRepository:
     return MongoAppointmentRepository(database=database)
 
 
+def get_calendar_service() -> CalendarService:
+    return GoogleCalendarService(settings=get_settings())
+
+
 def get_create_appointment_use_case() -> CreateAppointmentUseCase:
-    return CreateAppointmentUseCase(repository=get_appointment_repository())
+    return CreateAppointmentUseCase(
+        repository=get_appointment_repository(),
+        calendar_service=get_calendar_service(),
+    )
 
 
 def get_get_appointment_use_case() -> GetAppointmentUseCase:

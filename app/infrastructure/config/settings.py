@@ -17,6 +17,14 @@ class Settings(BaseSettings):
         default="lab_agenda",
         validation_alias="APP_MONGODB_DB_NAME",
     )
+    google_calendar_id: str | None = Field(
+        default=None,
+        validation_alias="APP_GOOGLE_CALENDAR_ID",
+    )
+    google_service_account_file: str | None = Field(
+        default=None,
+        validation_alias="APP_GOOGLE_SERVICE_ACCOUNT_FILE",
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",
