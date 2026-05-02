@@ -8,9 +8,19 @@ from app.domain.entities.appointment import AppointmentStatus
 
 class AgentIntent(StrEnum):
     CREATE = "create"
+    GET = "get"
     LIST = "list"
     UPDATE = "update"
-    DELETE = "delete"
+    CONFIRM = "confirm"
+    CANCEL = "cancel"
+    UNKNOWN = "unknown"
+
+
+class AgentRole(StrEnum):
+    ROUTER = "router"
+    SCHEDULING = "scheduling"
+    QUERY = "query"
+    CONFIRMATION = "confirmation"
     UNKNOWN = "unknown"
 
 
@@ -23,6 +33,7 @@ class AgentActionParameters(BaseModel):
 
 
 class AgentAction(BaseModel):
+    agent_role: AgentRole
     intent: AgentIntent
     parameters: AgentActionParameters
     original_input: str

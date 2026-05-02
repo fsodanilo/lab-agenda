@@ -74,11 +74,10 @@ flowchart LR
 
 	subgraph Agents[Agents]
 		AgentEntry
-		Decision[No de decisao]
-		CreateAction[No de acao: criar]
-		ListAction[No de acao: listar]
-		UpdateAction[No de acao: atualizar]
-		DeleteAction[No de acao: deletar]
+		RouterAgent[Router Agent]
+		SchedulingAgent[Scheduling Agent]
+		QueryAgent[Query Agent]
+		ConfirmationAgent[Confirmation Agent]
 	end
 
 	subgraph Application[Application]
@@ -104,15 +103,14 @@ flowchart LR
 	Routes --> Schemas
 	Routes --> CreateUC
 	Routes --> CrudUC
-	AgentEntry --> Decision
-	Decision --> CreateAction
-	Decision --> ListAction
-	Decision --> UpdateAction
-	Decision --> DeleteAction
-	CreateAction --> CreateUC
-	ListAction --> CrudUC
-	UpdateAction --> CrudUC
-	DeleteAction --> CrudUC
+	AgentEntry --> RouterAgent
+	RouterAgent --> SchedulingAgent
+	RouterAgent --> QueryAgent
+	RouterAgent --> ConfirmationAgent
+	SchedulingAgent --> CreateUC
+	SchedulingAgent --> CrudUC
+	QueryAgent --> CrudUC
+	ConfirmationAgent --> CrudUC
 
 	CreateUC --> Appointment
 	CrudUC --> Appointment
@@ -167,20 +165,31 @@ Endpoints disponiveis para compromissos:
 
 ## Agente LangGraph
 
-O projeto possui um agente separado do FastAPI para interpretar linguagem natural e decidir a intencao relacionada a compromissos.
+O projeto possui um sistema multi-agente separado do FastAPI para interpretar linguagem natural e decidir a intencao relacionada a compromissos.
+
+Agentes:
+
+- `Router Agent`: decide a intencao e a rota do fluxo
+- `Scheduling Agent`: trata criacao e atualizacao
+- `Query Agent`: trata busca e listagem
+- `Confirmation Agent`: trata confirmacao e cancelamento
 
 Fluxo do agente:
 
-- no de entrada
-- no de decisao
-- nos de acao para criar, listar, atualizar e deletar
+- entrada do usuario
+- roteamento pelo `Router Agent`
+- execucao pelo agente especializado
+- delegacao para os casos de uso existentes
 
 Saida do agente:
 
 - intencao estruturada
 - parametros extraidos da mensagem do usuario
+- identificacao do agente responsavel pela decisao
 
-O agente foi implementado de forma assincrona com LangGraph para evitar bloqueio do servidor em cenarios concorrentes e pode reutilizar os casos de uso existentes por meio de um executor separado.
+Hooks de logging foram adicionados antes e depois de cada no do grafo como preparacao para integracao futura com Langfuse.
+
+O sistema multi-agente foi implementado de forma assincrona com LangGraph para evitar bloqueio do servidor em cenarios concorrentes e reutiliza os casos de uso existentes por meio de um executor separado.
 
 ## Configuracao De Ambiente
 
