@@ -25,6 +25,22 @@ class Settings(BaseSettings):
         default=None,
         validation_alias="APP_GOOGLE_SERVICE_ACCOUNT_FILE",
     )
+    telegram_bot_token: str | None = Field(
+        default=None,
+        validation_alias="APP_TELEGRAM_BOT_TOKEN",
+    )
+    telegram_api_base_url: str = Field(
+        default="https://api.telegram.org",
+        validation_alias="APP_TELEGRAM_API_BASE_URL",
+    )
+    gemini_api_key: str | None = Field(
+        default=None,
+        validation_alias="APP_GEMINI_API_KEY",
+    )
+    gemini_model: str = Field(
+        default="gemini-2.5-flash",
+        validation_alias="APP_GEMINI_MODEL",
+    )
 
     model_config = SettingsConfigDict(
         env_file=".env",
