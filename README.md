@@ -12,6 +12,7 @@ No estado atual, a aplicacao entrega:
 - fluxo assincrono na aplicacao e nos contratos principais
 - endpoint de health check em `GET /health`
 - CRUD de compromissos em `Appointment`
+- agente de decisao com LangGraph para interpretar linguagem natural
 - configuracao por variaveis de ambiente com Pydantic Settings
 - logging centralizado
 - integracao preparada com MongoDB usando Motor
@@ -30,6 +31,7 @@ No estado atual, a aplicacao entrega:
 
 ```text
 app/
+	agents/
 	domain/
 		entities/
 		interfaces/
@@ -55,6 +57,7 @@ tests/
 - `application`: casos de uso e orquestracao
 - `infrastructure`: configuracao, logging, conexao com MongoDB e implementacoes concretas
 - `presentation`: rotas e schemas HTTP
+- `agents`: grafo LangGraph e estrutura de decisao por linguagem natural
 - `tests`: testes automatizados
 
 ## Arquitetura
@@ -142,6 +145,23 @@ Endpoints disponiveis para compromissos:
 - `GET /appointments`
 - `PUT /appointments/{id}`
 - `DELETE /appointments/{id}`
+
+## Agente LangGraph
+
+O projeto possui um agente separado do FastAPI para interpretar linguagem natural e decidir a intencao relacionada a compromissos.
+
+Fluxo do agente:
+
+- no de entrada
+- no de decisao
+- nos de acao para criar, listar, atualizar e deletar
+
+Saida do agente:
+
+- intencao estruturada
+- parametros extraidos da mensagem do usuario
+
+O agente foi implementado de forma assincrona com LangGraph para evitar bloqueio do servidor em cenarios concorrentes e pode reutilizar os casos de uso existentes por meio de um executor separado.
 
 ## Configuracao De Ambiente
 
@@ -264,6 +284,12 @@ pytest tests/unit/application
 
 Esses testes usam mock de repository e nao acessam banco real.
 
+Teste unitario do agente LangGraph:
+
+```bash
+pytest tests/unit/agents
+```
+
 Teste de integracao da API de compromissos:
 
 ```bash
@@ -277,6 +303,7 @@ pytest tests/integration
 - Pydantic
 - Pydantic Settings
 - Motor
+- LangGraph
 - Pytest
 
 ## Principios Adotados
