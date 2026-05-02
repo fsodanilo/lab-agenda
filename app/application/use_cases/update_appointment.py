@@ -30,6 +30,7 @@ class UpdateAppointmentUseCase:
             datetime=command.datetime,
             status=command.status,
             notes=command.notes,
+            event_id=existing.event_id,
         )
         updated = await self._repository.update(command.appointment_id, appointment)
         if updated is None:

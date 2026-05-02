@@ -24,11 +24,11 @@ from app.application.use_cases.update_appointment import (
 from app.domain.entities.appointment import AppointmentStatus
 
 DATETIME_PATTERN = re.compile(
-    r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:\d{2})"
+    r"\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(?::\d{2})?(?:Z|[+-]\d{2}:\d{2})?"
 )
 APPOINTMENT_ID_PATTERNS = [
     re.compile(r"(?:compromisso|appointment)(?:_id| id)?[:= ]+([\w-]+)", re.IGNORECASE),
-    re.compile(r"id[:= ]+([\w-]+)", re.IGNORECASE),
+    re.compile(r"(?:^|\s)id[:= ]+([\w-]+)\b", re.IGNORECASE),
 ]
 USER_ID_PATTERNS = [
     re.compile(r"user_id[:= ]+([\w-]+)", re.IGNORECASE),
@@ -102,6 +102,12 @@ class RouterAgent:
         elif any(keyword in text for keyword in ["atualizar", "editar", "alterar", "reagendar"]):
             intent = AgentIntent.UPDATE
             route = AgentRole.SCHEDULING
+        elif any(
+            keyword in text
+            for keyword in ["disponibilidade", "horario disponivel", "horarios disponiveis"]
+        ):
+            intent = AgentIntent.AVAILABILITY
+            route = AgentRole.QUERY
         elif any(keyword in text for keyword in ["listar", "mostrar", "ver compromissos"]):
             intent = AgentIntent.LIST
             route = AgentRole.QUERY
@@ -142,6 +148,7 @@ class QueryAgent(_NaturalLanguageParser):
             parameters=AgentActionParameters(
                 appointment_id=self.extract_appointment_id(state["user_input"]),
                 user_id=self.extract_user_id(state["user_input"]),
+                datetime=self.extract_datetime(state["user_input"]),
             ),
             original_input=state["user_input"],
         )

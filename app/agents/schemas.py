@@ -13,6 +13,7 @@ class AgentIntent(StrEnum):
     UPDATE = "update"
     CONFIRM = "confirm"
     CANCEL = "cancel"
+    AVAILABILITY = "availability"
     UNKNOWN = "unknown"
 
 
