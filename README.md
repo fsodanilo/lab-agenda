@@ -13,12 +13,15 @@ No estado atual, a aplicacao entrega:
 - endpoint de health check em `GET /health`
 - CRUD de compromissos em `Appointment`
 - agente de decisao com LangGraph para interpretar linguagem natural
+- webhook de Telegram desacoplado da regra de negocio
 - configuracao por variaveis de ambiente com Pydantic Settings
 - logging centralizado
 - integracao preparada com MongoDB usando Motor
 - integracao com Google Calendar usando o cliente oficial da API Google
+- integracao com Gemini para classificacao e resposta do assistente conversacional
 - repository base generico e repository MongoDB para `Appointment`
 - casos de uso assincronos para criar, buscar, listar, atualizar e deletar `Appointment`
+- caso de uso para calcular horarios disponiveis da barbearia
 - criacao de evento no Google Calendar ao criar compromisso, com persistencia de `event_id`
 - testes automatizados com pytest, incluindo testes unitarios e integracao sem banco real
 
@@ -66,6 +69,7 @@ tests/
 flowchart LR
 	Client[Cliente HTTP] --> Routes[Rotas FastAPI]
 	User[Usuario em linguagem natural] --> AgentEntry[Entrada do Agente]
+	Telegram[Telegram Webhook] --> Routes
 
 	subgraph Presentation[Presentation]
 		Routes
@@ -94,15 +98,22 @@ flowchart LR
 	subgraph Infrastructure[Infrastructure]
 		MongoRepo[MongoAppointmentRepository]
 		GoogleSvc[GoogleCalendarService]
+		TelegramSvc[TelegramWebhookService]
+		TelegramClient[TelegramClient]
+		GeminiSvc[GeminiLLMService]
+		ContextStore[ConversationContextStore]
 		Settings[Settings]
 		Mongo[(MongoDB)]
 	end
 
 	GCal[Google Calendar API]
+	Gemini[Gemini API]
+	TelegramAPI[Telegram Bot API]
 
 	Routes --> Schemas
 	Routes --> CreateUC
 	Routes --> CrudUC
+	Routes --> TelegramSvc
 	AgentEntry --> RouterAgent
 	RouterAgent --> SchedulingAgent
 	RouterAgent --> QueryAgent
@@ -124,8 +135,16 @@ flowchart LR
 
 	MongoRepo --> Mongo
 	GoogleSvc --> GCal
+	TelegramSvc --> AgentEntry
+	TelegramSvc --> GeminiSvc
+	TelegramSvc --> ContextStore
+	TelegramSvc --> TelegramClient
+	GeminiSvc --> Gemini
+	TelegramClient --> TelegramAPI
 	Settings --> MongoRepo
 	Settings --> GoogleSvc
+	Settings --> GeminiSvc
+	Settings --> TelegramClient
 ```
 
 ## Modulo Appointment
@@ -173,6 +192,7 @@ Agentes:
 - `Scheduling Agent`: trata criacao e atualizacao
 - `Query Agent`: trata busca e listagem
 - `Confirmation Agent`: trata confirmacao e cancelamento
+- `GeminiLLMService`: classifica mensagens e gera a resposta final em portugues brasileiro
 
 Fluxo do agente:
 
@@ -186,6 +206,7 @@ Saida do agente:
 - intencao estruturada
 - parametros extraidos da mensagem do usuario
 - identificacao do agente responsavel pela decisao
+- resposta final enviada ao Telegram com contexto por `user_id`
 
 Hooks de logging foram adicionados antes e depois de cada no do grafo como preparacao para integracao futura com Langfuse.
 
@@ -208,6 +229,10 @@ APP_MONGODB_URI=mongodb://localhost:27017
 APP_MONGODB_DB_NAME=lab_agenda
 APP_GOOGLE_CALENDAR_ID=your-calendar-id@group.calendar.google.com
 APP_GOOGLE_SERVICE_ACCOUNT_FILE=credentials/service-account.json
+APP_TELEGRAM_BOT_TOKEN=your-telegram-bot-token
+APP_TELEGRAM_API_BASE_URL=https://api.telegram.org
+APP_GEMINI_API_KEY=your-gemini-api-key
+APP_GEMINI_MODEL=gemini-2.5-flash
 ```
 
 Para iniciar a configuracao local:
@@ -248,10 +273,53 @@ Para recursos que dependem de persistencia MongoDB, mantenha uma instancia do Mo
 
 Para a integracao com Google Calendar, configure `APP_GOOGLE_CALENDAR_ID` e `APP_GOOGLE_SERVICE_ACCOUNT_FILE` com as credenciais da conta de servico. As credenciais devem ficar fora do codigo-fonte e ser carregadas por variaveis de ambiente.
 
+Para a integracao com Telegram, configure `APP_TELEGRAM_BOT_TOKEN` e `APP_TELEGRAM_API_BASE_URL`. O webhook recebe a mensagem, consulta o sistema multi-agente e envia a resposta de volta ao usuario pela Bot API.
+
+Para a camada conversacional com Gemini, configure `APP_GEMINI_API_KEY` e `APP_GEMINI_MODEL`. O Gemini e usado para classificar a intencao da mensagem e gerar a resposta final do assistente.
+
 Documentacao automatica:
 
 - Swagger UI: `http://127.0.0.1:8000/docs`
 - ReDoc: `http://127.0.0.1:8000/redoc`
+
+## Webhook Do Telegram
+
+Endpoint disponivel:
+
+- `POST /telegram/webhook`
+
+Fluxo:
+
+- o Telegram entrega a mensagem no webhook do FastAPI
+- a infraestrutura conversa com o Gemini para classificar a intencao e montar a resposta
+- a mensagem e enviada ao sistema multi-agente para execucao dos casos de uso
+- a resposta final e enviada ao usuario pela Bot API do Telegram
+
+Contexto por usuario:
+
+- o contexto conversacional e mantido por `user_id`
+- referencias como "nesse dia" e "esse horario" podem reaproveitar a ultima data ou compromisso discutido
+
+Exemplo:
+
+```text
+Usuario: Tenho horario amanha?
+Assistente: Posso verificar os horarios livres de amanha para voce e sugerir os melhores horarios disponiveis.
+```
+
+Como testar localmente:
+
+1. Terminal 1: iniciar a API com `uvicorn app.main:app --reload`
+2. Terminal 2: iniciar o tunel com `cloudflared tunnel --url http://127.0.0.1:8000`
+3. Terminal 3: registrar o webhook substituindo a URL publica
+
+```bash
+curl -X POST "https://api.telegram.org/bot$APP_TELEGRAM_BOT_TOKEN/setWebhook" \
+	-H "Content-Type: application/json" \
+	-d '{"url":"https://SUA-URL-PUBLICA/telegram/webhook"}'
+```
+
+4. Enviar uma mensagem para o bot no Telegram e acompanhar o processamento pelos logs da API
 
 ## Endpoint Disponivel
 
