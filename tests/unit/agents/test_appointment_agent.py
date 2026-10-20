@@ -77,3 +77,13 @@ async def test_agent_routes_availability_action() -> None:
     assert action.agent_role is AgentRole.QUERY
     assert action.parameters.user_id == "user-321"
     assert action.parameters.datetime is not None
+
+
+@pytest.mark.anyio
+async def test_agent_routes_availability_for_date_question() -> None:
+    agent = AppointmentLangGraphAgent()
+
+    action = await agent.decide("qual data tem disponível?")
+
+    assert action.intent is AgentIntent.AVAILABILITY
+    assert action.agent_role is AgentRole.QUERY

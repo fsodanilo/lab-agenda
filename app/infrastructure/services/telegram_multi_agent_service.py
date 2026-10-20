@@ -30,6 +30,30 @@ LIST_KEYWORDS = (
     "mostrar agendamentos",
     "mostrar compromissos",
 )
+AVAILABILITY_KEYWORDS = (
+    "disponibilidade",
+    "horario disponivel",
+    "horarios disponiveis",
+    "horario disponível",
+    "horarios disponíveis",
+    "tem disponibilidade",
+    "tem horario",
+    "tem horarios",
+    "qual data tem",
+    "qual data esta",
+    "qual data está",
+    "quais datas",
+    "data disponivel",
+    "datas disponiveis",
+    "quais horarios",
+    "quais horários",
+    "esta disponivel",
+    "está disponivel",
+    "estao livres",
+    "estão livres",
+    "disponivel",
+    "disponível",
+)
 
 
 class TelegramAppointmentAssistant:
@@ -320,6 +344,8 @@ class TelegramAppointmentAssistant:
         classification: IntentClassification,
     ) -> IntentClassification:
         normalized = " ".join(user_message.lower().split())
+        if any(keyword in normalized for keyword in AVAILABILITY_KEYWORDS):
+            return IntentClassification(intent="availability", confidence=1.0, requested_time_iso=None)
         if any(keyword in normalized for keyword in LIST_KEYWORDS):
             return IntentClassification(intent="list", confidence=1.0, requested_time_iso=None)
         return classification
