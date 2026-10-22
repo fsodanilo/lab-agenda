@@ -147,6 +147,75 @@ flowchart LR
 	Settings --> TelegramClient
 ```
 
+## Discovery e Limites do Sistema
+
+### Escopo e nível da visão
+
+O Lab Agenda é uma API backend para gestão de compromissos de uma barbearia. Esta documentação apresenta uma visão estrutural dos principais componentes e uma visão comportamental da criação de um compromisso. O cliente HTTP consome a API; a aplicação não inclui interface web própria.
+
+### Responsabilidades e integrações
+
+- A camada de apresentação recebe e valida requisições HTTP.
+- Os casos de uso coordenam as operações de negócio; o domínio define entidades e contratos.
+- A infraestrutura persiste compromissos no MongoDB e integra-se ao Google Calendar.
+- O agente conversacional e o serviço de linguagem natural apoiam a interpretação de mensagens.
+
+### Restrições e lacunas conhecidas
+
+- O código e a configuração documentados neste repositório descrevem um webhook de Telegram. O canal de WhatsApp mencionado no contexto de uso não está representado nessa integração; é necessário confirmar e documentar o adaptador real antes de usar este desenho como especificação de implementação.
+- A criação chama o Google Calendar antes de persistir o compromisso no MongoDB. Se a persistência falhar após a criação do evento, o tratamento/compensação dessa inconsistência precisa ser definido.
+- Autenticação da API, política de privacidade e retenção de dados, comportamento de indisponibilidade das integrações e metas de desempenho devem ser confirmados conforme o ambiente de implantação.
+
+### Jornada crítica: criar compromisso
+
+O diagrama abaixo representa o fluxo da API HTTP: a requisição é validada, o evento é criado no Google Calendar e, em seguida, o compromisso com o identificador externo é persistido no MongoDB. As falhas de integração e a necessidade de definir compensação estão explícitas como pontos de atenção.
+
+```mermaid
+sequenceDiagram
+	actor Cliente
+	participant API as FastAPI (POST /appointments)
+	participant CasoUso as CreateAppointmentUseCase
+	participant Calendario as GoogleCalendarService
+	participant Google as Google Calendar API
+	participant Repositorio as MongoAppointmentRepository
+	participant Mongo as MongoDB
+
+	Cliente->>API: Envia dados do compromisso
+	API->>API: Valida o payload
+	API->>CasoUso: Executa comando de criação
+	CasoUso->>Calendario: Cria evento
+	Calendario->>Google: Insere evento na agenda
+	alt Falha ao criar evento externo
+		Google-->>Calendario: Erro da integração
+		Calendario-->>CasoUso: Propaga falha
+		CasoUso-->>API: Criação não concluída
+		API-->>Cliente: Retorna erro
+	else Evento criado
+		Google-->>Calendario: Retorna event_id
+		Calendario-->>CasoUso: Retorna event_id
+		CasoUso->>Repositorio: Persiste compromisso com event_id
+		Repositorio->>Mongo: Insere documento
+		alt Persistência concluída
+			Mongo-->>Repositorio: Documento salvo
+			Repositorio-->>CasoUso: Retorna compromisso
+			CasoUso-->>API: Retorna compromisso criado
+			API-->>Cliente: HTTP 201 e dados do compromisso
+		else Falha na persistência
+			Mongo-->>Repositorio: Erro de persistência
+			Repositorio-->>CasoUso: Propaga falha
+			Note over Google,Mongo: Pode permanecer um evento no Google Calendar sem registro local; compensação não está especificada.
+			CasoUso-->>API: Criação não concluída
+			API-->>Cliente: Retorna erro
+		end
+	end
+```
+
+### Decisões e ajustes da documentação
+
+- O diagrama estrutural de arquitetura já existente foi mantido como visão dos componentes documentados no projeto.
+- Foi acrescentado o diagrama de sequência da criação pela API, evitando representar como implementado um fluxo de WhatsApp que não está descrito no repositório.
+- A divergência entre WhatsApp e Telegram, e o risco de consistência entre Google Calendar e MongoDB, foram registrados como lacunas para validação humana — não como decisões tomadas pelo modelo.
+
 ## Modulo Appointment
 
 O dominio `Appointment` foi introduzido com os campos:
