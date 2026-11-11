@@ -86,3 +86,6 @@ def test_ask_model_sends_key_in_header_and_uses_gemini_payload(monkeypatch) -> N
     assert captured_request.get_header("X-goog-api-key") == "AIzaFAKE_KEY"
     payload = json.loads(captured_request.data)
     assert payload["contents"][0]["parts"][0]["text"].startswith("Log de testes:")
+
+
+# Test for _ask_model ensuring API key is sent in header and payload is correct
