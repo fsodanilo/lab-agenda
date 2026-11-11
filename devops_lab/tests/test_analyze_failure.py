@@ -1,9 +1,12 @@
 import json
+from io import BytesIO
+from urllib.error import HTTPError
 
 from devops_lab.analyze_failure import (
     _ask_model,
     _extract_gemini_text,
     _filter_lab_diff,
+    _http_error_details,
     _read_pull_request,
     _redact_secrets,
 )
@@ -30,6 +33,22 @@ def test_redact_secrets_masks_common_assignments() -> None:
     log = "api_key=example-secret token:example-token sk-abcdefghijklmnopqrstuvwxyz12345"
 
     assert _redact_secrets(log) == "api_key=[REDACTED] token:[REDACTED] [REDACTED]"
+
+
+def test_http_error_details_reports_status_and_redacts_key() -> None:
+    error = HTTPError(
+        url="https://example.invalid",
+        code=403,
+        msg="Forbidden",
+        hdrs=None,
+        fp=BytesIO(b'{"error":"API key AIzaabcdefghijklmnopqrstuvwxyz123456 is invalid"}'),
+    )
+
+    details = _http_error_details(error)
+
+    assert details.startswith("HTTP 403:")
+    assert "AIzaabcdefghijklmnopqrstuvwxyz123456" not in details
+    assert "[REDACTED]" in details
 
 
 def test_filter_lab_diff_excludes_other_project_files() -> None:
