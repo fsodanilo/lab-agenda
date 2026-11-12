@@ -160,8 +160,13 @@ def main() -> int:
         stage = "fetch pull request diff"
         diff = _filter_lab_diff(_load_diff(repository, pull_request_number, github_token))
         diff = _redact_secrets(diff)[-MAX_CONTEXT_LENGTH:]
+<<<<<<< HEAD
         stage = "call Groq"
         result = _ask_model(log, diff, api_key, os.environ.get("GROQ_MODEL", "qwen/qwen3.8-27b"))
+=======
+        stage = "call Gemini"
+        result = _ask_model(log, diff, api_key, os.environ.get("GEMINI_MODEL", "gemini-2.5-flash-lite"))
+>>>>>>> 44f4abbee0ba05358d18c0d75a93f13e3cd66bae
         stage = "publish pull request comment"
         _publish_result(result, repository, github_token, pull_request_number)
     except HTTPError as error:

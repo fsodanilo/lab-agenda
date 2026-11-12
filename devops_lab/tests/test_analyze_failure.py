@@ -51,6 +51,22 @@ def test_http_error_details_reports_status_and_redacts_groq_key() -> None:
     assert "[REDACTED]" in details
 
 
+def test_http_error_details_reports_status_and_redacts_key() -> None:
+    error = HTTPError(
+        url="https://example.invalid",
+        code=403,
+        msg="Forbidden",
+        hdrs=None,
+        fp=BytesIO(b'{"error":"API key AIzaabcdefghijklmnopqrstuvwxyz123456 is invalid"}'),
+    )
+
+    details = _http_error_details(error)
+
+    assert details.startswith("HTTP 403:")
+    assert "AIzaabcdefghijklmnopqrstuvwxyz123456" not in details
+    assert "[REDACTED]" in details
+
+
 def test_filter_lab_diff_excludes_other_project_files() -> None:
     diff = (
         "diff --git a/app/main.py b/app/main.py\n+change outside lab\n"
@@ -104,5 +120,12 @@ def test_ask_model_sends_key_in_header_and_uses_groq_payload(monkeypatch) -> Non
     assert captured_request.full_url == "https://api.groq.com/openai/v1/chat/completions"
     assert captured_request.get_header("Authorization") == "Bearer gsk_FAKE_KEY"
     payload = json.loads(captured_request.data)
+<<<<<<< HEAD
     assert payload["model"] == "qwen/qwen3.8-27b"
     assert payload["messages"][1]["content"].startswith("Log de testes:")
+=======
+    assert payload["contents"][0]["parts"][0]["text"].startswith("Log de testes:")
+
+
+# Test for _ask_model ensuring API key is sent in header and payload is correct
+>>>>>>> 44f4abbee0ba05358d18c0d75a93f13e3cd66bae
