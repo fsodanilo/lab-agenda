@@ -1,9 +1,12 @@
 import json
+from io import BytesIO
+from urllib.error import HTTPError
 
 from devops_lab.analyze_failure import (
     _ask_model,
-    _extract_gemini_text,
+    _extract_groq_text,
     _filter_lab_diff,
+    _http_error_details,
     _read_pull_request,
     _redact_secrets,
 )
@@ -27,9 +30,25 @@ def test_read_pull_request_returns_none_for_manual_run(tmp_path) -> None:
 
 
 def test_redact_secrets_masks_common_assignments() -> None:
-    log = "api_key=example-secret token:example-token sk-abcdefghijklmnopqrstuvwxyz12345"
+    log = "api_key=example-secret token:example-token sk-abcdefghijklmnopqrstuvwxyz12345 gsk_abcdefghijklmnopqrstuvwxyz12345"
 
-    assert _redact_secrets(log) == "api_key=[REDACTED] token:[REDACTED] [REDACTED]"
+    assert _redact_secrets(log) == "api_key=[REDACTED] token:[REDACTED] [REDACTED] [REDACTED]"
+
+
+def test_http_error_details_reports_status_and_redacts_groq_key() -> None:
+    error = HTTPError(
+        url="https://example.invalid",
+        code=429,
+        msg="Too Many Requests",
+        hdrs=None,
+        fp=BytesIO(b'{"error":"gsk_abcdefghijklmnopqrstuvwxyz12345 rate limit"}'),
+    )
+
+    details = _http_error_details(error)
+
+    assert details.startswith("HTTP 429:")
+    assert "gsk_abcdefghijklmnopqrstuvwxyz12345" not in details
+    assert "[REDACTED]" in details
 
 
 def test_filter_lab_diff_excludes_other_project_files() -> None:
@@ -45,17 +64,17 @@ def test_filter_lab_diff_excludes_other_project_files() -> None:
     )
 
 
-def test_extract_gemini_text_from_generate_content_response() -> None:
+def test_extract_groq_text_from_chat_completion_response() -> None:
     response = {
-        "candidates": [
-            {"content": {"parts": [{"text": "Diagnóstico preliminar."}]}}
+        "choices": [
+            {"message": {"content": "Diagnóstico preliminar."}}
         ]
     }
 
-    assert _extract_gemini_text(response) == "Diagnóstico preliminar."
+    assert _extract_groq_text(response) == "Diagnóstico preliminar."
 
 
-def test_ask_model_sends_key_in_header_and_uses_gemini_payload(monkeypatch) -> None:
+def test_ask_model_sends_key_in_header_and_uses_groq_payload(monkeypatch) -> None:
     captured_request = None
 
     class FakeResponse:
@@ -67,7 +86,7 @@ def test_ask_model_sends_key_in_header_and_uses_gemini_payload(monkeypatch) -> N
 
         def read(self) -> bytes:
             return json.dumps(
-                {"candidates": [{"content": {"parts": [{"text": "Diagnóstico."}]}}]}
+                {"choices": [{"message": {"content": "Diagnóstico."}}]}
             ).encode("utf-8")
 
     def fake_urlopen(request, timeout):
@@ -78,11 +97,12 @@ def test_ask_model_sends_key_in_header_and_uses_gemini_payload(monkeypatch) -> N
 
     monkeypatch.setattr("devops_lab.analyze_failure.urlopen", fake_urlopen)
 
-    result = _ask_model("falha de teste", "diff fictício", "AIzaFAKE_KEY", "gemini-2.5-flash-lite")
+    result = _ask_model("falha de teste", "diff fictício", "gsk_FAKE_KEY", "qwen/qwen3.8-27b")
 
     assert result == "Diagnóstico."
     assert captured_request is not None
-    assert "AIzaFAKE_KEY" not in captured_request.full_url
-    assert captured_request.get_header("X-goog-api-key") == "AIzaFAKE_KEY"
+    assert captured_request.full_url == "https://api.groq.com/openai/v1/chat/completions"
+    assert captured_request.get_header("Authorization") == "Bearer gsk_FAKE_KEY"
     payload = json.loads(captured_request.data)
-    assert payload["contents"][0]["parts"][0]["text"].startswith("Log de testes:")
+    assert payload["model"] == "qwen/qwen3.8-27b"
+    assert payload["messages"][1]["content"].startswith("Log de testes:")

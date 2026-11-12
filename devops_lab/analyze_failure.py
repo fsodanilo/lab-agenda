@@ -8,7 +8,7 @@ from urllib.request import Request, urlopen
 
 
 MAX_CONTEXT_LENGTH = 12_000
-GEMINI_API_BASE_URL = "https://generativelanguage.googleapis.com/v1beta"
+GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
 
 
 def _redact_secrets(text: str) -> str:
@@ -18,10 +18,16 @@ def _redact_secrets(text: str) -> str:
         text,
     )
     return re.sub(
-        r"\b(?:sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9_]{20,}|AIza[0-9A-Za-z_-]{20,})\b",
+        r"\b(?:sk-[A-Za-z0-9_-]{20,}|gh[pousr]_[A-Za-z0-9_]{20,}|AIza[0-9A-Za-z_-]{20,}|gsk_[A-Za-z0-9_-]{20,})\b",
         "[REDACTED]",
         redacted,
     )
+
+
+def _http_error_details(error: HTTPError) -> str:
+    response_body = error.read().decode("utf-8", errors="replace")
+    safe_body = _redact_secrets(response_body)[:500]
+    return f"HTTP {error.code}" + (f": {safe_body}" if safe_body else "")
 
 
 def _read_pull_request(event_path: str) -> tuple[str | None, str | None]:
@@ -72,44 +78,39 @@ def _ask_model(log: str, diff: str, api_key: str, model: str) -> str:
     )
     user_prompt = f"Log de testes:\n{log}\n\nDiff do PR:\n{diff or '[sem PR associado]'}"
     payload = {
-        "systemInstruction": {"parts": [{"text": system_prompt}]},
-        "contents": [{"role": "user", "parts": [{"text": user_prompt}]}],
-        "generationConfig": {"temperature": 0.1, "responseMimeType": "text/plain"},
+        "model": model,
+        "temperature": 0.1,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": user_prompt},
+        ],
     }
-    url = f"{GEMINI_API_BASE_URL}/models/{model}:generateContent"
     request = Request(
-        url,
+        GROQ_API_URL,
         data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
         headers={
-            "x-goog-api-key": api_key,
+            "Authorization": f"Bearer {api_key}",
             "Content-Type": "application/json",
         },
         method="POST",
     )
     with urlopen(request, timeout=45) as response:
         result = json.loads(response.read())
-    return _extract_gemini_text(result)
+    return _extract_groq_text(result)
 
 
-def _extract_gemini_text(payload: dict[str, object]) -> str:
-    candidates = payload.get("candidates")
-    if not isinstance(candidates, list) or not candidates:
-        raise ValueError("Gemini response did not include candidates")
+def _extract_groq_text(payload: dict[str, object]) -> str:
+    choices = payload.get("choices")
+    if not isinstance(choices, list) or not choices:
+        raise ValueError("Groq response did not include choices")
 
-    first_candidate = candidates[0]
-    if not isinstance(first_candidate, dict):
-        raise ValueError("Gemini candidate payload is invalid")
-    content = first_candidate.get("content")
-    if not isinstance(content, dict):
-        raise ValueError("Gemini content payload is invalid")
-    parts = content.get("parts")
-    if not isinstance(parts, list):
-        raise ValueError("Gemini response did not include content parts")
-
-    texts = [part["text"] for part in parts if isinstance(part, dict) and isinstance(part.get("text"), str)]
-    if not texts:
-        raise ValueError("Gemini response did not include text")
-    return "\n".join(texts).strip()
+    first_choice = choices[0]
+    if not isinstance(first_choice, dict):
+        raise ValueError("Groq choice payload is invalid")
+    message = first_choice.get("message")
+    if not isinstance(message, dict) or not isinstance(message.get("content"), str):
+        raise ValueError("Groq response did not include message content")
+    return message["content"].strip()
 
 
 def _publish_result(result: str, repository: str, token: str, pull_request_number: str | None) -> None:
@@ -144,24 +145,34 @@ def main() -> int:
         print("Usage: python devops_lab/analyze_failure.py <test-log>", file=sys.stderr)
         return 2
 
-    api_key = os.environ.get("GEMINI_API_KEY")
+    api_key = os.environ.get("GROQ_API_KEY")
     github_token = os.environ.get("GH_TOKEN")
     repository = os.environ.get("GITHUB_REPOSITORY")
     event_path = os.environ.get("GITHUB_EVENT_PATH")
     if not all((api_key, github_token, repository, event_path)):
-        print("Required GitHub/Gemini environment variables are missing.", file=sys.stderr)
+        print("Required GitHub/Groq environment variables are missing.", file=sys.stderr)
         return 2
 
+    stage = "read inputs"
     try:
         log = _redact_secrets(Path(sys.argv[1]).read_text(encoding="utf-8"))[-MAX_CONTEXT_LENGTH:]
         pull_request_number, _ = _read_pull_request(event_path)
+        stage = "fetch pull request diff"
         diff = _filter_lab_diff(_load_diff(repository, pull_request_number, github_token))
         diff = _redact_secrets(diff)[-MAX_CONTEXT_LENGTH:]
-        result = _ask_model(log, diff, api_key, os.environ.get("GEMINI_MODEL", "gemini-2.5-flash-lite"))
+        stage = "call Groq"
+        result = _ask_model(log, diff, api_key, os.environ.get("GROQ_MODEL", "qwen/qwen3.8-27b"))
+        stage = "publish pull request comment"
         _publish_result(result, repository, github_token, pull_request_number)
-    except (HTTPError, URLError, OSError, KeyError, ValueError) as error:
+    except HTTPError as error:
         print(
-            f"GenAI failure analysis could not complete ({type(error).__name__}).",
+            f"GenAI failure analysis failed during {stage}: {_http_error_details(error)}",
+            file=sys.stderr,
+        )
+        return 1
+    except (URLError, OSError, KeyError, ValueError) as error:
+        print(
+            f"GenAI failure analysis failed during {stage} ({type(error).__name__}).",
             file=sys.stderr,
         )
         return 1
