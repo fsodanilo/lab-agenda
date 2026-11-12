@@ -120,12 +120,5 @@ def test_ask_model_sends_key_in_header_and_uses_groq_payload(monkeypatch) -> Non
     assert captured_request.full_url == "https://api.groq.com/openai/v1/chat/completions"
     assert captured_request.get_header("Authorization") == "Bearer gsk_FAKE_KEY"
     payload = json.loads(captured_request.data)
-<<<<<<< HEAD
     assert payload["model"] == "qwen/qwen3.8-27b"
     assert payload["messages"][1]["content"].startswith("Log de testes:")
-=======
-    assert payload["contents"][0]["parts"][0]["text"].startswith("Log de testes:")
-
-
-# Test for _ask_model ensuring API key is sent in header and payload is correct
->>>>>>> 44f4abbee0ba05358d18c0d75a93f13e3cd66bae
