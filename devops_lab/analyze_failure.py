@@ -8,7 +8,7 @@ from urllib.request import Request, urlopen
 
 from openai import APIStatusError, OpenAI, OpenAIError
 
-# analise groq
+# analise groq de falhas de CI
 
 MAX_CONTEXT_LENGTH = 12_000
 GROQ_BASE_URL = "https://api.groq.com/openai/v1"
