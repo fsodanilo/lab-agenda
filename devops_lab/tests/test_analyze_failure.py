@@ -1,10 +1,10 @@
 import json
 from io import BytesIO
 from urllib.error import HTTPError
+from types import SimpleNamespace
 
 from devops_lab.analyze_failure import (
     _ask_model,
-    _extract_groq_text,
     _filter_lab_diff,
     _http_error_details,
     _read_pull_request,
@@ -80,45 +80,30 @@ def test_filter_lab_diff_excludes_other_project_files() -> None:
     )
 
 
-def test_extract_groq_text_from_chat_completion_response() -> None:
-    response = {
-        "choices": [
-            {"message": {"content": "Diagnóstico preliminar."}}
-        ]
-    }
+def test_ask_model_uses_groq_responses_api(monkeypatch) -> None:
+    captured: dict[str, object] = {}
 
-    assert _extract_groq_text(response) == "Diagnóstico preliminar."
+    class FakeResponses:
+        def create(self, **kwargs):
+            captured["request"] = kwargs
+            return SimpleNamespace(output_text="Diagnóstico.")
 
+    class FakeClient:
+        def __init__(self, **kwargs):
+            captured["client"] = kwargs
+            self.responses = FakeResponses()
 
-def test_ask_model_sends_key_in_header_and_uses_groq_payload(monkeypatch) -> None:
-    captured_request = None
+    monkeypatch.setattr("devops_lab.analyze_failure.OpenAI", FakeClient)
 
-    class FakeResponse:
-        def __enter__(self):
-            return self
-
-        def __exit__(self, *args):
-            return None
-
-        def read(self) -> bytes:
-            return json.dumps(
-                {"choices": [{"message": {"content": "Diagnóstico."}}]}
-            ).encode("utf-8")
-
-    def fake_urlopen(request, timeout):
-        nonlocal captured_request
-        captured_request = request
-        assert timeout == 45
-        return FakeResponse()
-
-    monkeypatch.setattr("devops_lab.analyze_failure.urlopen", fake_urlopen)
-
-    result = _ask_model("falha de teste", "diff fictício", "gsk_FAKE_KEY", "qwen/qwen3.8-27b")
+    result = _ask_model("falha de teste", "diff fictício", "gsk_FAKE_KEY", "openai/gpt-oss-20b")
 
     assert result == "Diagnóstico."
-    assert captured_request is not None
-    assert captured_request.full_url == "https://api.groq.com/openai/v1/chat/completions"
-    assert captured_request.get_header("Authorization") == "Bearer gsk_FAKE_KEY"
-    payload = json.loads(captured_request.data)
-    assert payload["model"] == "qwen/qwen3.8-27b"
-    assert payload["messages"][1]["content"].startswith("Log de testes:")
+    assert captured["client"] == {
+        "api_key": "gsk_FAKE_KEY",
+        "base_url": "https://api.groq.com/openai/v1",
+        "timeout": 45,
+    }
+    request = captured["request"]
+    assert request["model"] == "openai/gpt-oss-20b"
+    assert request["instructions"].startswith("Analise falhas de CI")
+    assert request["input"].startswith("Log de testes:")

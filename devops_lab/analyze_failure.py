@@ -6,9 +6,12 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+from openai import APIStatusError, OpenAI, OpenAIError
+
+# analise groq
 
 MAX_CONTEXT_LENGTH = 12_000
-GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
+GROQ_BASE_URL = "https://api.groq.com/openai/v1"
 
 
 def _redact_secrets(text: str) -> str:
@@ -28,6 +31,17 @@ def _http_error_details(error: HTTPError) -> str:
     response_body = error.read().decode("utf-8", errors="replace")
     safe_body = _redact_secrets(response_body)[:500]
     return f"HTTP {error.code}" + (f": {safe_body}" if safe_body else "")
+
+
+def _openai_error_details(error: OpenAIError) -> str:
+    if not isinstance(error, APIStatusError):
+        return type(error).__name__
+
+    body = error.body
+    if isinstance(body, (dict, list)):
+        body = json.dumps(body, ensure_ascii=False)
+    safe_body = _redact_secrets(str(body or ""))[:500]
+    return f"HTTP {error.status_code}" + (f": {safe_body}" if safe_body else "")
 
 
 def _read_pull_request(event_path: str) -> tuple[str | None, str | None]:
@@ -77,40 +91,17 @@ def _ask_model(log: str, diff: str, api_key: str, model: str) -> str:
         "falha observada, evidência, hipótese de causa e próximos passos para revisão humana."
     )
     user_prompt = f"Log de testes:\n{log}\n\nDiff do PR:\n{diff or '[sem PR associado]'}"
-    payload = {
-        "model": model,
-        "temperature": 0.1,
-        "messages": [
-            {"role": "system", "content": system_prompt},
-            {"role": "user", "content": user_prompt},
-        ],
-    }
-    request = Request(
-        GROQ_API_URL,
-        data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-        headers={
-            "Authorization": f"Bearer {api_key}",
-            "Content-Type": "application/json",
-        },
-        method="POST",
+    client = OpenAI(
+        api_key=api_key,
+        base_url=GROQ_BASE_URL,
+        timeout=45,
     )
-    with urlopen(request, timeout=45) as response:
-        result = json.loads(response.read())
-    return _extract_groq_text(result)
-
-
-def _extract_groq_text(payload: dict[str, object]) -> str:
-    choices = payload.get("choices")
-    if not isinstance(choices, list) or not choices:
-        raise ValueError("Groq response did not include choices")
-
-    first_choice = choices[0]
-    if not isinstance(first_choice, dict):
-        raise ValueError("Groq choice payload is invalid")
-    message = first_choice.get("message")
-    if not isinstance(message, dict) or not isinstance(message.get("content"), str):
-        raise ValueError("Groq response did not include message content")
-    return message["content"].strip()
+    response = client.responses.create(
+        model=model,
+        instructions=system_prompt,
+        input=user_prompt,
+    )
+    return response.output_text.strip()
 
 
 def _publish_result(result: str, repository: str, token: str, pull_request_number: str | None) -> None:
@@ -161,9 +152,15 @@ def main() -> int:
         diff = _filter_lab_diff(_load_diff(repository, pull_request_number, github_token))
         diff = _redact_secrets(diff)[-MAX_CONTEXT_LENGTH:]
         stage = "call Groq"
-        result = _ask_model(log, diff, api_key, os.environ.get("GROQ_MODEL", "qwen/qwen3.8-27b"))
+        result = _ask_model(log, diff, api_key, os.environ.get("GROQ_MODEL", "openai/gpt-oss-20b"))
         stage = "publish pull request comment"
         _publish_result(result, repository, github_token, pull_request_number)
+    except OpenAIError as error:
+        print(
+            f"GenAI failure analysis failed during {stage}: {_openai_error_details(error)}",
+            file=sys.stderr,
+        )
+        return 1
     except HTTPError as error:
         print(
             f"GenAI failure analysis failed during {stage}: {_http_error_details(error)}",
