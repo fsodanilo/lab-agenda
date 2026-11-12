@@ -24,6 +24,12 @@ def _redact_secrets(text: str) -> str:
     )
 
 
+def _http_error_details(error: HTTPError) -> str:
+    response_body = error.read().decode("utf-8", errors="replace")
+    safe_body = _redact_secrets(response_body)[:500]
+    return f"HTTP {error.code}" + (f": {safe_body}" if safe_body else "")
+
+
 def _read_pull_request(event_path: str) -> tuple[str | None, str | None]:
     event = json.loads(Path(event_path).read_text(encoding="utf-8"))
     workflow_run = event.get("workflow_run", {})
@@ -152,16 +158,26 @@ def main() -> int:
         print("Required GitHub/Gemini environment variables are missing.", file=sys.stderr)
         return 2
 
+    stage = "read inputs"
     try:
         log = _redact_secrets(Path(sys.argv[1]).read_text(encoding="utf-8"))[-MAX_CONTEXT_LENGTH:]
         pull_request_number, _ = _read_pull_request(event_path)
+        stage = "fetch pull request diff"
         diff = _filter_lab_diff(_load_diff(repository, pull_request_number, github_token))
         diff = _redact_secrets(diff)[-MAX_CONTEXT_LENGTH:]
+        stage = "call Gemini"
         result = _ask_model(log, diff, api_key, os.environ.get("GEMINI_MODEL", "gemini-2.5-flash-lite"))
+        stage = "publish pull request comment"
         _publish_result(result, repository, github_token, pull_request_number)
-    except (HTTPError, URLError, OSError, KeyError, ValueError) as error:
+    except HTTPError as error:
         print(
-            f"GenAI failure analysis could not complete ({type(error).__name__}).",
+            f"GenAI failure analysis failed during {stage}: {_http_error_details(error)}",
+            file=sys.stderr,
+        )
+        return 1
+    except (URLError, OSError, KeyError, ValueError) as error:
+        print(
+            f"GenAI failure analysis failed during {stage} ({type(error).__name__}).",
             file=sys.stderr,
         )
         return 1
