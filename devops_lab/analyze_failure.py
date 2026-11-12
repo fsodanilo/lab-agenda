@@ -6,6 +6,7 @@ from pathlib import Path
 from urllib.error import HTTPError, URLError
 from urllib.request import Request, urlopen
 
+# analise groq
 
 MAX_CONTEXT_LENGTH = 12_000
 GROQ_API_URL = "https://api.groq.com/openai/v1/chat/completions"
